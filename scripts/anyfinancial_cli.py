@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AnyFinancial CLI - Data Fusion SQL client for xyznot financial data."""
+"""AnyFinancial CLI - SQL client for xyznot financial data."""
 
 import argparse
 import datetime as _dt
@@ -205,7 +205,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="anyfinancial",
         description=(
-            "AnyFinancial CLI - Data Fusion SQL client for xyznot financial data.\n\n"
+            "AnyFinancial CLI - SQL client for xyznot financial data.\n\n"
             "Supports schema discovery, arbitrary SQL, latest price bars,\n"
             "company fundamentals, and ticker news."
         ),
@@ -226,7 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ds_p = subparsers.add_parser(
         "discover_schemas",
-        help="Discover table schemas using Data Fusion SQL DESCRIBE",
+        help="Discover table schemas using SQL DESCRIBE",
         description="Run DESCRIBE against known or specified financial tables.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -236,10 +236,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     q_p = subparsers.add_parser(
         "query",
-        help="Run arbitrary Data Fusion SQL",
+        help="Run arbitrary SQL",
         description="Run SQL against https://mcp.xyznot.com/v1/sql. If SQL is omitted, read from stdin.",
     )
-    q_p.add_argument("sql", nargs="?", help="Data Fusion SQL query string.")
+    q_p.add_argument("sql", nargs="?", help="SQL query string.")
     q_p.add_argument("--raw", action="store_true", help="Print response without pretty JSON formatting.")
     q_p.set_defaults(func=cmd_query)
 

@@ -7,7 +7,7 @@ Verify the AnyFinancial skill can:
 - Use the hardcoded API key from `scripts/shared/constants.json` with no configuration.
 - Print offline docs with `doc`.
 - Discover table schemas with `discover_schemas`.
-- Run arbitrary **Data Fusion SQL** with `query`.
+- Run arbitrary SQL with `query`.
 - Fetch latest price bars with `price`.
 - Fetch company fundamentals with `fundamentals`.
 - Fetch latest ticker news with `news`.

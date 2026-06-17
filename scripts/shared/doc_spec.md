@@ -2,7 +2,7 @@
 
 ## Protocol
 - Endpoint: POST https://mcp.xyznot.com/v1/sql
-- Format: raw **Data Fusion SQL** in the request body
+- Format: raw SQL in the request body
 - Headers:
   - `Content-Type: text/plain`
   - `Accept: application/json`
@@ -25,7 +25,7 @@ Uses `DESCRIBE <table>` through the V1 SQL API for each known table.
 | --tables | string | no | Comma-separated table list. Default: bars_1m,news,fundamentals |
 | --json | flag | no | Print raw JSON instead of Markdown |
 
-### 2. query - Run arbitrary Data Fusion SQL
+### 2. query - Run arbitrary SQL
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
@@ -61,7 +61,7 @@ No network request.
 
 ---
 
-## Data Fusion SQL Tables
+## Tables
 
 ### bars_1m
 
@@ -188,7 +188,7 @@ User query
 {{LANG_INVOKE}} discover_schemas
 ```
 
-### Scenario 6: Custom Data Fusion SQL
+### Scenario 6: Custom SQL
 
 ```bash
 {{LANG_INVOKE}} query "SELECT ticker, t, o, h, l, c, v FROM bars_1m WHERE ticker = 'AAPL' AND year = '2026' AND month = '6' ORDER BY t DESC LIMIT 10"
