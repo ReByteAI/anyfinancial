@@ -1,3 +1,5 @@
+[![Run on Rebyte](https://raw.githubusercontent.com/ReByteAI/run-any-skill-with-single-click/main/badge-v3.svg)](https://app.rebyte.ai/new?prompt=Use%20the%20anyfinancial%20skill.%20Get%20the%20latest%20price%2C%20news%2C%20and%20fundamentals%20for%20AAPL.)
+
 # AnyFinancial
 
 Specialized financial data skill for AI agents. Use this repo when an agent needs US market data through the bundled CLI.
