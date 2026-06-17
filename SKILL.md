@@ -1,6 +1,6 @@
 ---
 name: anyfinancial
-description: Financial data exploration skill for xyznot US market data. Use when an AI agent needs to discover available financial tables and columns, then query prices, news, fundamentals, dividends, settlement, or other US market datasets with SQL.
+description: Financial data exploration skill for US market data. Use when an AI agent needs to discover available financial tables and columns, then query prices, news, fundamentals, dividends, settlement, or other US market datasets with SQL.
 version: 1.0.0
 authors:
   - AnyFinancial Team
@@ -19,7 +19,7 @@ Use the bundled CLI directly:
 python3 scripts/anyfinancial_cli.py <command> [options]
 ```
 
-The CLI is zero-configuration. It reads the xyznot API key from `scripts/shared/constants.json`.
+The CLI is zero-configuration. It reads the data API key from `scripts/shared/constants.json`.
 
 ## Data Available
 

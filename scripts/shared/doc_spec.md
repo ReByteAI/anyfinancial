@@ -1,7 +1,7 @@
 # AnyFinancial Interface Specification (for AI Agent)
 
 ## Protocol
-- Endpoint: POST https://mcp.xyznot.com/v1/sql
+- Endpoint: configured in `scripts/shared/constants.json`
 - Format: raw SQL in the request body
 - Headers:
   - `Content-Type: text/plain`

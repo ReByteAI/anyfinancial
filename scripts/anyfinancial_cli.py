@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AnyFinancial CLI - SQL client for xyznot financial data."""
+"""AnyFinancial CLI - SQL client for financial data."""
 
 import argparse
 import datetime as _dt
@@ -205,7 +205,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="anyfinancial",
         description=(
-            "AnyFinancial CLI - SQL client for xyznot financial data.\n\n"
+            "AnyFinancial CLI - SQL client for financial data.\n\n"
             "Supports schema discovery, arbitrary SQL, latest price bars,\n"
             "company fundamentals, and ticker news."
         ),
@@ -237,7 +237,7 @@ def build_parser() -> argparse.ArgumentParser:
     q_p = subparsers.add_parser(
         "query",
         help="Run arbitrary SQL",
-        description="Run SQL against https://mcp.xyznot.com/v1/sql. If SQL is omitted, read from stdin.",
+        description="Run SQL against the configured financial data backend. If SQL is omitted, read from stdin.",
     )
     q_p.add_argument("sql", nargs="?", help="SQL query string.")
     q_p.add_argument("--raw", action="store_true", help="Print response without pretty JSON formatting.")

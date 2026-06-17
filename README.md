@@ -21,7 +21,7 @@ All data is daily-refreshed. This is not streaming or real-time market data.
 
 ## CLI
 
-Zero configuration. The CLI reads the hardcoded xyznot API key from `scripts/shared/constants.json`.
+Zero configuration. The CLI reads the hardcoded data API key from `scripts/shared/constants.json`.
 
 One-line usage:
 
