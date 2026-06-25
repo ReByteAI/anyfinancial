@@ -1,43 +1,35 @@
-[![Run on Rebyte](https://raw.githubusercontent.com/ReByteAI/run-any-skill-with-single-click/main/badge-v3.svg)](https://app.rebyte.ai/new?prompt=Use%20the%20anyfinancial%20skill.%20Get%20the%20latest%20price%2C%20news%2C%20and%20fundamentals%20for%20AAPL.)
+[![Run on Rebyte](https://raw.githubusercontent.com/ReByteAI/run-any-skill-with-single-click/main/badge-v3.svg)](https://app.rebyte.ai/new?prompt=Use%20the%20anyfinancial%20skill.%20Connect%20to%20Rebyte%20Financial%20Data%20Service%2C%20inspect%20the%20catalog%2C%20and%20run%20a%20small%20LIMIT%20query.)
 
 # AnyFinancial
 
-Specialized financial data skill for AI agents. Use this repo when an agent needs US market data through the bundled CLI.
+Codex skill for Rebyte Financial Data Service.
 
-## Status
+The user-facing app is `https://app.rebyte.ai/financial`, but the Data Service API is accessed through the Relay API:
 
-Beta. No access setup is needed right now; this may change later.
+```text
+https://api.rebyte.ai/api/data
+```
 
-## Data Available
+Inside a Rebyte VM/workspace, the skill and CLI prefer the sandbox token and relay URL from `/home/user/.rebyte.ai/auth.json`.
 
-- Daily financial news with ticker-linked articles
-- Tick data / OHLCV bars
-- End-of-day data
-- 1-minute bar data, updated daily, not real-time
-- Fundamental data: income statement, balance sheet, cash flow
-- Dividend yield data
-- Settlement data
-- US market coverage only
-
-All data is daily-refreshed. This is not streaming or real-time market data.
-
-## CLI
-
-Zero configuration. The CLI reads the hardcoded data API key from `scripts/shared/constants.json`.
-
-One-line usage:
+## Usage
 
 ```bash
-python3 scripts/anyfinancial_cli.py discover_schemas
-python3 scripts/anyfinancial_cli.py price AAPL
-python3 scripts/anyfinancial_cli.py news TSLA --limit 5
-python3 scripts/anyfinancial_cli.py fundamentals MSFT --limit 3
-python3 scripts/anyfinancial_cli.py query "SELECT ticker, t, c FROM bars_1m WHERE ticker = 'AAPL' AND year = '2026' AND month = '6' ORDER BY t DESC LIMIT 5"
-python3 scripts/anyfinancial_cli.py doc
+python3 scripts/anyfinancial_cli.py schema
+python3 scripts/anyfinancial_cli.py catalog
+python3 scripts/anyfinancial_cli.py query "SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
+python3 scripts/anyfinancial_cli.py smoke --sql "SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
 ```
+
+## Workflow
+
+1. Call catalog first.
+2. Inspect available tables.
+3. Run a small read-only SQL query with `LIMIT`.
+4. Report the exact command, HTTP result, `rowCount`, first 3 rows, and any error message.
 
 ## SQL Rules
 
-- For `bars_1m`, always include `year` and `month` filters.
-- For ticker arrays in `news` and `fundamentals`, use `ARRAY_CONTAINS(tickers, 'AAPL')`.
-- Run `discover_schemas` before using unfamiliar columns.
+- Allowed starts: `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`.
+- One SQL statement only.
+- No mutating statements such as `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, or `TRUNCATE`.

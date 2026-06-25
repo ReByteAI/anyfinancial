@@ -1,9 +1,5 @@
 {
-  "endpoint": "https://mcp.xyznot.com/v1/sql",
-  "api_key": "a5ff6f5f752c1f04948ba3ce27119ad4202c41f1d52120698ec045b8d25f206e",
-  "known_tables": [
-    "bars_1m",
-    "news",
-    "fundamentals"
-  ]
+  "default_api_url": "https://api.rebyte.ai",
+  "auth_json": "/home/user/.rebyte.ai/auth.json",
+  "data_path": "/api/data"
 }

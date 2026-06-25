@@ -1,201 +1,74 @@
-# AnyFinancial Interface Specification (for AI Agent)
+# AnyFinancial Interface Specification
 
-## Protocol
-- Endpoint: configured in `scripts/shared/constants.json`
-- Format: raw SQL in the request body
-- Headers:
-  - `Content-Type: text/plain`
-  - `Accept: application/json`
-  - `X-API-Key: <API_KEY>`
+Use Rebyte Financial Data Service through the Relay API.
 
-## CLI Invocation ({{LANG_NAME}})
+## Endpoint
 
-```{{LANG_CODEBLOCK}}
+- App domain: `https://app.rebyte.ai/financial`
+- Relay API default: `https://api.rebyte.ai`
+- Data namespace: `/api/data`
+
+Inside a Rebyte VM/workspace, prefer `/home/user/.rebyte.ai/auth.json`:
+
+```bash
+AUTH_TOKEN="$(rebyte-auth 2>/dev/null || jq -r '.sandbox.token' /home/user/.rebyte.ai/auth.json)"
+API_URL="$(jq -r '.sandbox.relay_url // empty' /home/user/.rebyte.ai/auth.json 2>/dev/null || true)"
+API_URL="${API_URL:-https://api.rebyte.ai}"
+```
+
+## CLI
+
+```bash
 {{LANG_INVOKE}} <command> [options]
 ```
 
-## Available Commands
-
-### 1. discover_schemas - Discover known table schemas
-
-Uses `DESCRIBE <table>` through the V1 SQL API for each known table.
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| --tables | string | no | Comma-separated table list. Default: bars_1m,news,fundamentals |
-| --json | flag | no | Print raw JSON instead of Markdown |
-
-### 2. query - Run arbitrary SQL
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| sql | string | YES | SQL query string. If omitted, SQL is read from stdin |
-| --raw | flag | no | Print response body without JSON formatting |
-
-### 3. price - Get latest price bars for a ticker
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| ticker | string | YES | Stock ticker |
-| --year | string | no | bars_1m partition year. Defaults to current UTC year |
-| --month | string | no | bars_1m partition month. Defaults to current UTC month without leading zero |
-| --limit | int | no | Number of bars, default 1 |
-
-### 4. fundamentals - Get company fundamentals
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| ticker | string | YES | Stock ticker |
-| --limit | int | no | Number of filings/periods, default 5 |
-
-### 5. news - Get latest news for a ticker
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| ticker | string | YES | Stock ticker |
-| --limit | int | no | Number of articles, default 5 |
-
-### 6. doc - Print this offline specification
-
-No network request.
-
----
-
-## Tables
-
-### bars_1m
-
-Minute-level OHLCV price bars.
-
-Important columns:
-
-| Column | Meaning |
-|--------|---------|
-| ticker | Stock symbol |
-| t | UTC timestamp |
-| o | Open price |
-| h | High price |
-| l | Low price |
-| c | Close price |
-| v | Volume |
-| year | String partition year |
-| month | String partition month |
-
-**Required performance rule:** `bars_1m` is partitioned by `year` and `month`. Include both in `WHERE` whenever querying this table:
-
-```sql
-WHERE ticker = 'AAPL' AND year = '2026' AND month = '6'
-```
-
-### news
-
-Financial news articles.
-
-Important columns:
-
-| Column | Meaning |
-|--------|---------|
-| id | Article ID |
-| published_utc | Publication timestamp |
-| title | Headline |
-| tickers | Array of mentioned tickers |
-| content | Article text |
-| content_embedding | Vector embedding; avoid selecting unless needed |
-
-Ticker filtering:
-
-```sql
-WHERE ARRAY_CONTAINS(tickers, 'AAPL')
-```
-
-### fundamentals
-
-SEC/XBRL-derived company fundamentals.
-
-Important columns:
-
-| Column | Meaning |
-|--------|---------|
-| company_name | Company name |
-| tickers | Array of ticker symbols |
-| fiscal_year | Fiscal year |
-| fiscal_period | Fiscal period |
-| start_date | Period start |
-| end_date | Period end |
-| is_net_income_loss | Net income/loss |
-| is_revenues | Revenue |
-| bs_assets | Balance-sheet assets |
-
-The table has many more `is_*`, `bs_*`, `cf_*`, and `ci_*` columns. Run `discover_schemas` before using unfamiliar fields.
-
-Ticker filtering:
-
-```sql
-WHERE ARRAY_CONTAINS(tickers, 'AAPL')
-```
-
----
-
-## Decision Flow
-
-```
-User query
-  |
-  +-- Latest ticker price?
-  |     YES -> {{LANG_INVOKE}} price TICKER
-  |
-  +-- Recent ticker news?
-  |     YES -> {{LANG_INVOKE}} news TICKER --limit N
-  |
-  +-- Fundamentals / revenue / net income / assets?
-  |     YES -> {{LANG_INVOKE}} fundamentals TICKER --limit N
-  |
-  +-- Need custom SQL or multi-table analysis?
-  |     YES -> discover_schemas if columns are uncertain, then query
-```
-
----
-
-## Scenario Examples (all runnable CLI commands)
-
-### Scenario 1: Latest price
+Commands:
 
 ```bash
-{{LANG_INVOKE}} price AAPL
+{{LANG_INVOKE}} schema
+{{LANG_INVOKE}} schema --all
+{{LANG_INVOKE}} catalog
+{{LANG_INVOKE}} query "SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
+{{LANG_INVOKE}} smoke --sql "SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
 ```
 
-### Scenario 2: Recent price bars
+## API
+
+### Schema, no auth required
 
 ```bash
-{{LANG_INVOKE}} price AAPL --year 2026 --month 6 --limit 5
+curl -fsS "$API_URL/api/data/schema" | jq '.financial'
 ```
 
-### Scenario 3: Fundamentals
+### Catalog, auth required
 
 ```bash
-{{LANG_INVOKE}} fundamentals AAPL --limit 5
+curl -fsS -X POST "$API_URL/api/data/financial/catalog" \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}' | jq '.'
 ```
 
-### Scenario 4: News
+### SQL, auth required
 
 ```bash
-{{LANG_INVOKE}} news TSLA --limit 5
+SQL="SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
+jq -n --arg sql "$SQL" '{sql: $sql, parameters: []}' > /tmp/financial-query.json
+
+curl -fsS -X POST "$API_URL/api/data/financial/sql" \
+  -H "Authorization: Bearer $AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @/tmp/financial-query.json | jq '.'
 ```
 
-### Scenario 5: Schema discovery
+## SQL Rules
 
-```bash
-{{LANG_INVOKE}} discover_schemas
-```
+- SQL must be read-only.
+- Allowed starts: `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`.
+- Use one SQL statement only.
+- Do not use `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, or other mutating statements.
+- Call catalog first, inspect available tables, then run a small `LIMIT` query.
 
-### Scenario 6: Custom SQL
+## Reporting
 
-```bash
-{{LANG_INVOKE}} query "SELECT ticker, t, o, h, l, c, v FROM bars_1m WHERE ticker = 'AAPL' AND year = '2026' AND month = '6' ORDER BY t DESC LIMIT 10"
-```
-
-### Scenario 7: Array ticker filtering
-
-```bash
-{{LANG_INVOKE}} query "SELECT published_utc, title FROM news WHERE ARRAY_CONTAINS(tickers, 'AAPL') ORDER BY published_utc DESC LIMIT 5"
-```
+Report the exact command, HTTP result, `rowCount`, first 3 rows, and any error message.
