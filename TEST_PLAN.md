@@ -9,6 +9,8 @@ Validate that the skill points only to Rebyte Financial Data Service through the
 3. Legacy endpoint and API-key auth paths are absent.
 4. The CLI resolves auth from `AUTH_TOKEN`, `rebyte-auth`, or `/home/user/.rebyte.ai/auth.json`.
 5. SQL validation rejects mutating statements and multiple statements.
+6. The CLI has no required third-party Python dependency; `requests` is optional and stdlib fallback is available.
+7. API responses with `success: false` fail the command even when the HTTP status is 200.
 
 ## Commands
 
@@ -21,6 +23,7 @@ Validate that the skill points only to Rebyte Financial Data Service through the
 | 5 | `python3 scripts/anyfinancial_cli.py smoke` | Calls catalog first, then SQL query |
 | 6 | `python3 scripts/anyfinancial_cli.py query "DELETE FROM cn.bars_1m WHERE 1=1"` | Fails before network request |
 | 7 | `python3 scripts/anyfinancial_cli.py query "SELECT 1; SELECT 2"` | Fails before network request |
+| 8 | `python3 -S scripts/anyfinancial_cli.py schema --report` | Uses the stdlib fallback path. In environments with a working Python CA bundle this should call schema; otherwise it must report the underlying TLS/connection reason clearly. |
 
 ## Manual Connectivity
 

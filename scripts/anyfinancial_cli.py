@@ -9,9 +9,14 @@ import re
 import subprocess
 import sys
 from typing import Any, Optional
+from urllib import error as urlerror
+from urllib import request as urlrequest
 from urllib.parse import urljoin
 
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 if sys.stdout.encoding != "utf-8":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -119,11 +124,37 @@ def _headers(token: Optional[str] = None) -> dict[str, str]:
     return headers
 
 
+class HttpResponse:
+    def __init__(self, status_code: int):
+        self.status_code = status_code
+
+
+def _decode_response_body(raw: bytes) -> Any:
+    text = raw.decode("utf-8", errors="replace")
+    try:
+        return json.loads(text)
+    except ValueError:
+        return text
+
+
 def _request_json(method: str, url: str, *, token: Optional[str] = None, payload: Any = None, timeout: int = 60):
+    if requests is not None:
+        return _request_json_with_requests(method, url, token=token, payload=payload, timeout=timeout)
+    return _request_json_with_urllib(method, url, token=token, payload=payload, timeout=timeout)
+
+
+def _request_json_with_requests(
+    method: str,
+    url: str,
+    *,
+    token: Optional[str] = None,
+    payload: Any = None,
+    timeout: int = 60,
+):
     try:
         resp = requests.request(method, url, headers=_headers(token), json=payload, timeout=timeout)
-    except requests.exceptions.ConnectionError:
-        return None, {"error": "Connection Error: unable to reach the API endpoint."}
+    except requests.exceptions.ConnectionError as e:
+        return None, {"error": f"Connection Error: unable to reach the API endpoint: {e}"}
     except requests.exceptions.Timeout:
         return None, {"error": "Timeout: the API request timed out."}
     except requests.exceptions.RequestException as e:
@@ -133,7 +164,34 @@ def _request_json(method: str, url: str, *, token: Optional[str] = None, payload
         body = resp.json()
     except ValueError:
         body = resp.text
-    return resp, body
+    return HttpResponse(resp.status_code), body
+
+
+def _request_json_with_urllib(
+    method: str,
+    url: str,
+    *,
+    token: Optional[str] = None,
+    payload: Any = None,
+    timeout: int = 60,
+):
+    data = None
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+    req = urlrequest.Request(url, data=data, headers=_headers(token), method=method)
+    try:
+        with urlrequest.urlopen(req, timeout=timeout) as resp:
+            body = _decode_response_body(resp.read())
+            return HttpResponse(resp.status), body
+    except urlerror.HTTPError as e:
+        body = _decode_response_body(e.read())
+        return HttpResponse(e.code), body
+    except urlerror.URLError as e:
+        return None, {"error": f"Connection Error: unable to reach the API endpoint: {e.reason}"}
+    except TimeoutError:
+        return None, {"error": "Timeout: the API request timed out."}
+    except OSError as e:
+        return None, {"error": str(e)}
 
 
 def _print_json(value: Any) -> None:
@@ -212,6 +270,14 @@ def _extract_error(body: Any) -> Optional[str]:
     return None
 
 
+def _is_api_failure(body: Any) -> bool:
+    return isinstance(body, dict) and body.get("success") is False
+
+
+def _request_failed(resp: Optional[HttpResponse], body: Any) -> bool:
+    return resp is None or resp.status_code >= 400 or _is_api_failure(body)
+
+
 def _redacted_curl(method: str, url: str, payload: Optional[str] = None, auth: bool = False) -> str:
     parts = [f'curl -fsS -X {method} "{url}"']
     if auth:
@@ -233,7 +299,7 @@ def cmd_schema(args) -> None:
         print(f"Command:\n{_redacted_curl('GET', url)}")
         print(f"HTTP result: {resp.status_code if resp is not None else 'request failed'}")
     _print_json(output)
-    if resp is None or resp.status_code >= 400:
+    if _request_failed(resp, body):
         sys.exit(1)
 
 
@@ -249,7 +315,7 @@ def cmd_catalog(args) -> None:
         print(f"Command:\n{_redacted_curl('POST', url, '{}', auth=True)}")
         print(f"HTTP result: {resp.status_code if resp is not None else 'request failed'}")
     _print_json(body)
-    if resp is None or resp.status_code >= 400:
+    if _request_failed(resp, body):
         sys.exit(1)
 
 
@@ -280,7 +346,7 @@ def cmd_query(args) -> None:
     else:
         _print_json(body)
 
-    if resp is None or resp.status_code >= 400:
+    if _request_failed(resp, body):
         sys.exit(1)
 
 
@@ -296,7 +362,7 @@ def cmd_smoke(args) -> None:
     print("Catalog command:")
     print(_redacted_curl("POST", catalog_url, "{}", auth=True))
     print(f"Catalog HTTP result: {catalog_resp.status_code if catalog_resp is not None else 'request failed'}")
-    if catalog_resp is None or catalog_resp.status_code >= 400:
+    if _request_failed(catalog_resp, catalog_body):
         print("Catalog error:")
         _print_json(catalog_body)
         sys.exit(1)
@@ -318,7 +384,7 @@ def cmd_smoke(args) -> None:
     _print_json(rows[:3])
     print(f"error: {error or ''}")
 
-    if query_resp is None or query_resp.status_code >= 400:
+    if _request_failed(query_resp, query_body):
         sys.exit(1)
 
 

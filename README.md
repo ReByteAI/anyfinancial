@@ -14,6 +14,9 @@ Inside a Rebyte VM/workspace, the skill and CLI prefer the sandbox token and rel
 
 ## Usage
 
+The CLI works without required third-party packages. It uses `requests` when
+available and falls back to Python's standard-library HTTP client otherwise.
+
 ```bash
 python3 scripts/anyfinancial_cli.py schema
 python3 scripts/anyfinancial_cli.py catalog
