@@ -17,7 +17,7 @@ Validate that the skill exposes exactly the market-agnostic workflow
 
 | # | Command | Expected |
 |---|---------|----------|
-| 1 | `python3 scripts/anyfinancial_cli.py catalog --report` | Calls `POST /api/data/financial/catalog` with bearer auth; lists every table |
+| 1 | `python3 scripts/anyfinancial_cli.py catalog --report` | Runs `SHOW TABLES` via the SQL endpoint; lists every registered table (incl. non-served ones) |
 | 2 | `python3 scripts/anyfinancial_cli.py schema cn.bars_1m --report` | Runs `DESCRIBE cn.bars_1m` via the SQL endpoint; returns `column_name`, `data_type`, `is_nullable` |
 | 3 | `python3 scripts/anyfinancial_cli.py query "SELECT * FROM cn.bars_1m LIMIT 10" --report` | Calls SQL endpoint and reports HTTP result, `rowCount`, first 3 rows, and error |
 | 4 | `python3 scripts/anyfinancial_cli.py schema "cn.bars_1m; DROP TABLE x"` | Fails before network request (invalid table identifier) |
@@ -34,8 +34,8 @@ AUTH_TOKEN="$(rebyte-auth 2>/dev/null || jq -r '.sandbox.token' /home/user/.reby
 API_URL="$(jq -r '.sandbox.relay_url // empty' /home/user/.rebyte.ai/auth.json 2>/dev/null || true)"
 API_URL="${API_URL:-https://api.rebyte.ai}"
 
-curl -fsS -X POST "$API_URL/api/data/financial/catalog" \
+curl -fsS -X POST "$API_URL/api/data/financial/sql" \
   -H "Authorization: Bearer $AUTH_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{}' | jq '.'
+  -d '{"sql":"SHOW TABLES","parameters":[]}' | jq '.'
 ```

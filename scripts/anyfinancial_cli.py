@@ -320,15 +320,19 @@ def cmd_schema(args) -> None:
 
 
 def cmd_catalog(args) -> None:
+    # SHOW TABLES is the complete registered catalog. (information_schema.tables
+    # only lists currently-served tables and silently omits the rest.)
     api_url = _resolve_api_url(args)
     token = _resolve_token(args)
     if not token:
         print("Error: authentication token unavailable.", file=sys.stderr)
         sys.exit(1)
-    url = _endpoint(api_url, "financial/catalog")
-    resp, body = _request_json("POST", url, token=token, payload={}, timeout=args.timeout)
+    url = _endpoint(api_url, "financial/sql")
+    payload = {"sql": "SHOW TABLES", "parameters": []}
+    resp, body = _request_json("POST", url, token=token, payload=payload, timeout=args.timeout)
     if args.report:
-        print(f"Command:\n{_redacted_curl('POST', url, '{}', auth=True)}")
+        print("Command:")
+        print(_redacted_curl("POST", url, json.dumps(payload, ensure_ascii=False), auth=True))
         print(f"HTTP result: {resp.status_code if resp is not None else 'request failed'}")
     _print_json(body)
     if _request_failed(resp, body):

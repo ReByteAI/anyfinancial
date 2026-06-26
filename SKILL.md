@@ -6,7 +6,8 @@ description: Query Rebyte Financial Data Service with read-only SQL through the 
 # AnyFinancial
 
 Read-only SQL access to Rebyte Financial Data Service through the Relay Data API
-(`/api/data/financial`). Always work in three steps: **catalog → schema → query.**
+(`/api/data/financial`). The service runs **Apache DataFusion SQL** (Spice.ai).
+Always work in three steps: **catalog → schema → query.**
 
 ## Authentication
 
@@ -25,12 +26,17 @@ python3 scripts/anyfinancial_cli.py catalog
 ```
 
 ```bash
-curl -fsS -X POST "$API_URL/api/data/financial/catalog" \
+curl -fsS -X POST "$API_URL/api/data/financial/sql" \
   -H "Authorization: Bearer $AUTH_TOKEN" -H "Content-Type: application/json" \
-  -d '{}' | jq '.'
+  -d '{"sql":"SHOW TABLES","parameters":[]}' | jq '.'
 ```
 
-Returns one row per table with `table_schema`, `table_name`, `table_type`. Pick the fully-qualified table you need (e.g. `cn.bars_1m`).
+The catalog is `SHOW TABLES`. It returns every registered table as `table_schema`,
+`table_name`, `table_type`. Ignore rows where `table_schema = information_schema`
+(system tables). Pick the fully-qualified table you need (e.g. `cn.bars_1m`).
+
+> Use `SHOW TABLES`, not `information_schema.tables` — the latter omits tables
+> that are not currently served and gives an incomplete catalog.
 
 ## 2. Get a table's exact schema — before querying it
 
@@ -60,10 +66,37 @@ curl -fsS -X POST "$API_URL/api/data/financial/sql" \
   -d '{"sql":"SELECT trade_time, c FROM cn.bars_1m WHERE ts_code = '\''000001.SZ'\'' ORDER BY trade_time DESC LIMIT 10","parameters":[]}' | jq '.'
 ```
 
-## SQL rules
+## SQL dialect — Apache DataFusion (NOT Postgres / MySQL / T-SQL)
 
-- Read-only, one statement per request.
-- Allowed starts: `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`.
+Write DataFusion SQL. These are verified to work:
+
+| Need | Use |
+|---|---|
+| Current time | `now()` |
+| Truncate to period | `date_trunc('day', trade_time)` |
+| Bucket into N-minute bars | `date_bin(INTERVAL '5 minutes', trade_time, TIMESTAMP '1970-01-01')` |
+| Relative time filter | `trade_time > now() - INTERVAL '7 days'` |
+| Parse a timestamp | `to_timestamp('2024-01-01T00:00:00')` |
+| Part of a date | `extract(year FROM trade_time)` |
+| Cast | `CAST(x AS BIGINT)` or `arrow_cast(x, 'Int64')` |
+| String concat / match | `a || b`, `col ILIKE 'a%'` |
+| Paging | `LIMIT 100 OFFSET 0` |
+
+Do **not** use (they error — switch syntax, do not retry as-is):
+`DATEADD` / `DATEDIFF` / `GETDATE()` (use `now()`, `date_trunc`, `INTERVAL` math),
+`TOP n` (use `LIMIT n`), `SELECT INTO`, stored procedures, or vendor-specific functions.
+
+## Rules
+
+- Read-only, one statement per request. Allowed starts: `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`.
 - No mutating statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, …).
-- Keep exploratory queries narrow: project only needed columns and add `LIMIT`.
+- Project only needed columns and add `LIMIT` while exploring.
 - The catalog (step 1) and table schema (step 2) are the source of truth for table and column names.
+
+## On error — do not loop
+
+If a query fails, do not resubmit the same or a near-identical statement. Instead:
+
+1. Read the error message. `Invalid function` / `No field named …` means wrong dialect or wrong column → fix it using the DataFusion table above and the table schema from step 2.
+2. Change exactly one thing and retry.
+3. After 2–3 failed attempts, **stop** and report the exact failing SQL and the exact error. Do not keep retrying.

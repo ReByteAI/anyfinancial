@@ -3,7 +3,8 @@
 # AnyFinancial
 
 Read-only SQL access to Rebyte Financial Data Service through the Relay Data API
-(`https://api.rebyte.ai/api/data/financial`).
+(`https://api.rebyte.ai/api/data/financial`). The service runs **Apache DataFusion
+SQL** (Spice.ai).
 
 The API is market-agnostic: it exposes a single catalog of tables and a read-only
 SQL endpoint. Whatever tables the service holds appear in the catalog — the skill
@@ -15,7 +16,7 @@ from `/home/user/.rebyte.ai/auth.json`.
 ## Workflow: catalog → schema → query
 
 ```bash
-# 1. List every table the service holds
+# 1. List every table the service holds (runs SHOW TABLES)
 python3 scripts/anyfinancial_cli.py catalog
 
 # 2. Read a table's exact columns before querying it
@@ -30,6 +31,7 @@ falls back to Python's standard-library HTTP client.
 
 ## SQL rules
 
+- Write **Apache DataFusion** SQL (e.g. `now()`, `date_trunc`, `date_bin`, `INTERVAL` math) — not Postgres/T-SQL idioms like `DATEADD`/`GETDATE()`/`TOP`. See `SKILL.md` for the dialect table and the on-error/do-not-loop rule.
 - Read-only, one statement per request.
 - Allowed starts: `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`.
 - No mutating statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, …).
