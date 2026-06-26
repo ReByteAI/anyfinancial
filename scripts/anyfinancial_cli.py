@@ -288,17 +288,33 @@ def _redacted_curl(method: str, url: str, payload: Optional[str] = None, auth: b
     return " \\\n".join(parts)
 
 
+_TABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
+
+
 def cmd_schema(args) -> None:
+    """Return a single table's exact columns via DESCRIBE."""
+    table = args.table.strip()
+    if not _TABLE_NAME_RE.match(table):
+        print(
+            f"Error: invalid table name '{table}'. Use a schema-qualified identifier, e.g. cn.bars_1m.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     api_url = _resolve_api_url(args)
-    url = _endpoint(api_url, "schema")
-    resp, body = _request_json("GET", url, timeout=args.timeout)
-    output = body
-    if not args.all and isinstance(body, dict) and "financial" in body:
-        output = body["financial"]
+    token = _resolve_token(args)
+    if not token:
+        print("Error: authentication token unavailable.", file=sys.stderr)
+        sys.exit(1)
+
+    url = _endpoint(api_url, "financial/sql")
+    payload = {"sql": f"DESCRIBE {table}", "parameters": []}
+    resp, body = _request_json("POST", url, token=token, payload=payload, timeout=args.timeout)
     if args.report:
-        print(f"Command:\n{_redacted_curl('GET', url)}")
+        print("Command:")
+        print(_redacted_curl("POST", url, json.dumps(payload, ensure_ascii=False), auth=True))
         print(f"HTTP result: {resp.status_code if resp is not None else 'request failed'}")
-    _print_json(output)
+    _print_json(body)
     if _request_failed(resp, body):
         sys.exit(1)
 
@@ -350,67 +366,16 @@ def cmd_query(args) -> None:
         sys.exit(1)
 
 
-def cmd_smoke(args) -> None:
-    api_url = _resolve_api_url(args)
-    token = _resolve_token(args)
-    if not token:
-        print("Error: authentication token unavailable.", file=sys.stderr)
-        sys.exit(1)
-
-    catalog_url = _endpoint(api_url, "financial/catalog")
-    catalog_resp, catalog_body = _request_json("POST", catalog_url, token=token, payload={}, timeout=args.timeout)
-    print("Catalog command:")
-    print(_redacted_curl("POST", catalog_url, "{}", auth=True))
-    print(f"Catalog HTTP result: {catalog_resp.status_code if catalog_resp is not None else 'request failed'}")
-    if _request_failed(catalog_resp, catalog_body):
-        print("Catalog error:")
-        _print_json(catalog_body)
-        sys.exit(1)
-
-    sql = args.sql
-    _validate_read_only_sql(sql)
-    sql_url = _endpoint(api_url, "financial/sql")
-    payload = {"sql": sql, "parameters": []}
-    query_resp, query_body = _request_json("POST", sql_url, token=token, payload=payload, timeout=args.timeout)
-    rows = _extract_rows(query_body)
-    row_count = _extract_row_count(query_body, rows)
-    error = _extract_error(query_body)
-
-    print("SQL command:")
-    print(_redacted_curl("POST", sql_url, json.dumps(payload, ensure_ascii=False), auth=True))
-    print(f"SQL HTTP result: {query_resp.status_code if query_resp is not None else 'request failed'}")
-    print(f"rowCount: {row_count if row_count is not None else 'unavailable'}")
-    print("first 3 rows:")
-    _print_json(rows[:3])
-    print(f"error: {error or ''}")
-
-    if _request_failed(query_resp, query_body):
-        sys.exit(1)
-
-
-def _render_doc() -> str:
-    doc_path = os.path.join(_script_dir(), "shared", "doc_spec.md")
-    with open(doc_path, "r", encoding="utf-8") as f:
-        tpl = f.read()
-    tpl = tpl.replace("{{LANG_INVOKE}}", "python3 scripts/anyfinancial_cli.py")
-    return tpl
-
-
-def cmd_doc(args) -> None:
-    print(_render_doc())
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="anyfinancial",
-        description="CLI for Rebyte Financial Data Service.",
+        description="CLI for Rebyte Financial Data Service. Workflow: catalog -> schema -> query.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  anyfinancial schema\n"
             "  anyfinancial catalog\n"
+            "  anyfinancial schema cn.bars_1m\n"
             "  anyfinancial query \"SELECT * FROM cn.bars_1m LIMIT 10\" --report\n"
-            "  anyfinancial smoke --sql \"SELECT * FROM cn.bars_1m LIMIT 10\"\n"
         ),
     )
     parser.add_argument("--api-url", help="Relay API base URL. Defaults to auth.json sandbox relay_url or https://api.rebyte.ai.")
@@ -419,30 +384,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    schema_p = subparsers.add_parser("schema", help="Call GET /api/data/schema; no auth required.")
-    schema_p.add_argument("--all", action="store_true", help="Print the full schema response instead of only .financial.")
-    schema_p.add_argument("--report", action="store_true", help="Include exact command and HTTP result.")
-    schema_p.set_defaults(func=cmd_schema)
-
-    catalog_p = subparsers.add_parser("catalog", help="Call POST /api/data/financial/catalog.")
+    catalog_p = subparsers.add_parser("catalog", help="List every table. POST /api/data/financial/catalog.")
     catalog_p.add_argument("--report", action="store_true", help="Include exact command and HTTP result.")
     catalog_p.set_defaults(func=cmd_catalog)
+
+    schema_p = subparsers.add_parser("schema", help="Show one table's exact columns via DESCRIBE <table>.")
+    schema_p.add_argument("table", help="Schema-qualified table name, e.g. cn.bars_1m.")
+    schema_p.add_argument("--report", action="store_true", help="Include exact command and HTTP result.")
+    schema_p.set_defaults(func=cmd_schema)
 
     query_p = subparsers.add_parser("query", help="Run one read-only SQL statement.")
     query_p.add_argument("sql", nargs="?", help="SQL string. If omitted, SQL is read from stdin.")
     query_p.add_argument("--report", action="store_true", help="Report command, HTTP result, rowCount, first 3 rows, and error.")
     query_p.set_defaults(func=cmd_query)
-
-    smoke_p = subparsers.add_parser("smoke", help="Call catalog, then run a small SQL query and report the result.")
-    smoke_p.add_argument(
-        "--sql",
-        default="SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10",
-        help="Read-only SQL query to run after catalog.",
-    )
-    smoke_p.set_defaults(func=cmd_smoke)
-
-    doc_p = subparsers.add_parser("doc", help="Print AI-facing interface specification.")
-    doc_p.set_defaults(func=cmd_doc)
 
     return parser
 
@@ -451,7 +405,7 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     if args.command is None:
-        print(_render_doc())
+        parser.print_help()
         sys.exit(0)
     args.func(args)
 

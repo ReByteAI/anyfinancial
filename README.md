@@ -1,38 +1,35 @@
-[![Run on Rebyte](https://raw.githubusercontent.com/ReByteAI/run-any-skill-with-single-click/main/badge-v3.svg)](https://app.rebyte.ai/new?prompt=Use%20the%20anyfinancial%20skill.%20Connect%20to%20Rebyte%20Financial%20Data%20Service%2C%20inspect%20the%20catalog%2C%20and%20run%20a%20small%20LIMIT%20query.)
+[![Run on Rebyte](https://raw.githubusercontent.com/ReByteAI/run-any-skill-with-single-click/main/badge-v3.svg)](https://app.rebyte.ai/new?prompt=Use%20the%20anyfinancial%20skill.%20List%20the%20catalog%2C%20read%20a%20table%20schema%2C%20and%20run%20a%20small%20LIMIT%20query.)
 
 # AnyFinancial
 
-Codex skill for Rebyte Financial Data Service.
+Read-only SQL access to Rebyte Financial Data Service through the Relay Data API
+(`https://api.rebyte.ai/api/data/financial`).
 
-The user-facing app is `https://app.rebyte.ai/financial`, but the Data Service API is accessed through the Relay API:
+The API is market-agnostic: it exposes a single catalog of tables and a read-only
+SQL endpoint. Whatever tables the service holds appear in the catalog — the skill
+does not special-case any market.
 
-```text
-https://api.rebyte.ai/api/data
-```
+Inside a Rebyte VM/workspace the skill and CLI read the sandbox token and relay URL
+from `/home/user/.rebyte.ai/auth.json`.
 
-Inside a Rebyte VM/workspace, the skill and CLI prefer the sandbox token and relay URL from `/home/user/.rebyte.ai/auth.json`.
-
-## Usage
-
-The CLI works without required third-party packages. It uses `requests` when
-available and falls back to Python's standard-library HTTP client otherwise.
+## Workflow: catalog → schema → query
 
 ```bash
-python3 scripts/anyfinancial_cli.py schema
+# 1. List every table the service holds
 python3 scripts/anyfinancial_cli.py catalog
-python3 scripts/anyfinancial_cli.py query "SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
-python3 scripts/anyfinancial_cli.py smoke --sql "SELECT * FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
+
+# 2. Read a table's exact columns before querying it
+python3 scripts/anyfinancial_cli.py schema cn.bars_1m
+
+# 3. Run one read-only SQL statement
+python3 scripts/anyfinancial_cli.py query "SELECT trade_time, c FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
 ```
 
-## Workflow
+The CLI has no required third-party packages — it uses `requests` when available and
+falls back to Python's standard-library HTTP client.
 
-1. Call catalog first.
-2. Inspect available tables.
-3. Run a small read-only SQL query with `LIMIT`.
-4. Report the exact command, HTTP result, `rowCount`, first 3 rows, and any error message.
+## SQL rules
 
-## SQL Rules
-
+- Read-only, one statement per request.
 - Allowed starts: `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`.
-- One SQL statement only.
-- No mutating statements such as `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, or `TRUNCATE`.
+- No mutating statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, …).
