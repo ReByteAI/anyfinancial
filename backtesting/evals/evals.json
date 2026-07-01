@@ -1,0 +1,23 @@
+{
+  "skill_name": "backtesting",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Backtest a moving-average crossover on AAPL and MSFT over the last couple of years. I want to know if it actually beats buy-and-hold, with realistic costs.",
+      "expected_output": "Agent runs Phase 1-5: installs the engine, collects parameters via the two forms (defaults fine), fetches AAPL+MSFT daily bars via anyfinancial, runs in-sample and out-of-sample SMA crossover with commission+slippage, and reports the fixed template comparing OOS vs buy-and-hold with limitations stated.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I have my own strategy idea based on RSI. Can this framework test it, and how would I plug it in?",
+      "expected_output": "Agent explains the plug-in contract (copy strategies/sma_cross.py; first two config fields are instrument_id and bar_type; point strategy.path/config_path at the new classes), and offers to scaffold the strategy file and a config, then run Phases 3-5.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Run an EMA cross backtest on NVDA for 2023 with a $1M margin account and tell me the Sharpe and max drawdown.",
+      "expected_output": "Agent uses the bundled EMACross via config-only swap (nautilus_trader.examples.strategies.ema_cross), sets starting_balance 1000000 / MARGIN, fetches NVDA daily bars, executes, and reports Sharpe + max drawdown in the template with caveats.",
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "run_name": "aapl_msft_sma_2024",
+  "data": {
+    "source_table": "us.eod",
+    "interval": "1day",
+    "tickers": ["AAPL", "MSFT"],
+    "start": "2024-01-01",
+    "end": "today",
+    "cache_dir": "data_cache"
+  },
+  "venue": {
+    "name": "XNAS",
+    "account_type": "MARGIN",
+    "base_currency": "USD",
+    "starting_balance": 100000,
+    "price_precision": 2,
+    "commission_per_order_usd": 1.0,
+    "slippage_prob": 0.1
+  },
+  "strategy": {
+    "path": "strategies.sma_cross:SMACross",
+    "config_path": "strategies.sma_cross:SMACrossConfig",
+    "params": {
+      "fast_period": 10,
+      "slow_period": 30,
+      "trade_size": 100
+    }
+  },
+  "evaluation": {
+    "oos_split": 0.3,
+    "warmup_bars": 30,
+    "random_seed": 42
+  },
+  "log_level": "ERROR"
+}
