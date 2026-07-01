@@ -2,3 +2,15 @@
 runtime.conf
 __pycache__
 *.pyc
+
+# data skill — us_news local builder store
+data/data_builder/us_news/us_news.db
+data/data_builder/us_news/us_news.db-wal
+data/data_builder/us_news/us_news.db-shm
+
+# backtesting skill — local venv, data cache, run reports
+backtesting/.venv-backtest/
+backtesting/data_cache/
+*.db
+*.db-wal
+*.db-shm

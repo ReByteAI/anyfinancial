@@ -1,37 +1,54 @@
-[![Run on Rebyte](https://raw.githubusercontent.com/ReByteAI/run-any-skill-with-single-click/main/badge-v3.svg)](https://app.rebyte.ai/new?prompt=Use%20the%20anyfinancial%20skill.%20List%20the%20catalog%2C%20read%20a%20table%20schema%2C%20and%20run%20a%20small%20LIMIT%20query.)
+[![Run on Rebyte](https://raw.githubusercontent.com/ReByteAI/run-any-skill-with-single-click/main/badge-v3.svg)](https://app.rebyte.ai/new?prompt=Use%20the%20anyfinancial%20data%20skill.%20List%20the%20catalog%2C%20read%20a%20table%20schema%2C%20and%20run%20a%20small%20LIMIT%20query.)
 
 # AnyFinancial
 
-Read-only SQL access to Rebyte Financial Data Service through the Relay Data API
-(`https://api.rebyte.ai/api/data/financial`). The service runs **Apache DataFusion
-SQL** (Spice.ai).
+A multi-skill **ripple** for financial data and strategy research on Rebyte.
+Each skill lives in its own top-level directory with its own `SKILL.md` and
+bundled resources; agents load whichever skill a task needs.
 
-The API is market-agnostic: it exposes a single catalog of tables and a read-only
-SQL endpoint. Whatever tables the service holds appear in the catalog — the skill
-does not special-case any market.
+## Skills
 
-Inside a Rebyte VM/workspace the skill and CLI read the sandbox token and relay URL
-from `/home/user/.rebyte.ai/auth.json`.
+| Skill | Directory | What it does |
+|---|---|---|
+| **data** | [`data/`](data/) | Read-only **SQL** over the Rebyte Financial Data Service (Apache DataFusion), plus **semantic (vector) search** over news. Workflow: catalog → schema → query. Includes the `us_news` local builder (incremental mirror + embeddings). |
+| **backtesting** | [`backtesting/`](backtesting/) | Realistic, event-driven **backtests** with **NautilusTrader**, using the **data** skill for price retrieval. Phase-based: setup → parameters → data → execute → report. |
 
-## Workflow: catalog → schema → query
+## Layout
 
-```bash
-# 1. List every table the service holds (runs SHOW TABLES)
-python3 scripts/anyfinancial_cli.py catalog
-
-# 2. Read a table's exact columns before querying it
-python3 scripts/anyfinancial_cli.py schema cn.bars_1m
-
-# 3. Run one read-only SQL statement
-python3 scripts/anyfinancial_cli.py query "SELECT trade_time, c FROM cn.bars_1m WHERE ts_code = '000001.SZ' ORDER BY trade_time DESC LIMIT 10"
+```
+anyfinancial/                     ← the ripple (this repo)
+├── data/                         ← skill: data
+│   ├── SKILL.md
+│   ├── scripts/                  (anyfinancial_cli.py, shared/constants.json)
+│   ├── data_builder/us_news/     (local mirror + semantic search)
+│   ├── README.md · TEST_PLAN.md · .env.example
+├── backtesting/                  ← skill: backtesting
+│   ├── SKILL.md
+│   ├── scripts/                  (setup.sh, fetch_data.py, run_backtest.py)
+│   ├── strategies/ · references/ · evals/
+│   └── config.example.json
+└── README.md · .gitignore        ← ripple-level
 ```
 
-The CLI has no required third-party packages — it uses `requests` when available and
-falls back to Python's standard-library HTTP client.
+## How the skills compose
 
-## SQL rules
+`backtesting` retrieves prices through `data`: its `fetch_data.py` calls the
+`data` skill's CLI (`data/scripts/anyfinancial_cli.py`) to pull OHLCV bars from
+`us.eod` / `us.bars_1m`, then runs them through NautilusTrader. You can use
+`data` on its own for any read-only financial SQL or news search.
 
-- Write **Apache DataFusion** SQL (e.g. `now()`, `date_trunc`, `date_bin`, `INTERVAL` math) — not Postgres/T-SQL idioms like `DATEADD`/`GETDATE()`/`TOP`. See `SKILL.md` for the dialect table and the on-error/do-not-loop rule.
-- Read-only, one statement per request.
-- Allowed starts: `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `DESC`, `EXPLAIN`.
-- No mutating statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, …).
+## Quickstart
+
+```bash
+# data skill — discover and query
+python3 data/scripts/anyfinancial_cli.py catalog
+python3 data/scripts/anyfinancial_cli.py schema us.eod
+python3 data/scripts/anyfinancial_cli.py query "SELECT t, c FROM us.eod WHERE ticker='AAPL' ORDER BY t DESC LIMIT 5"
+
+# backtesting skill — install, then follow backtesting/SKILL.md
+bash backtesting/scripts/setup.sh
+```
+
+Inside a Rebyte VM/workspace both skills read the sandbox token and relay URL
+from `/home/user/.rebyte.ai/auth.json` automatically. See each skill's `SKILL.md`
+for the full workflow.

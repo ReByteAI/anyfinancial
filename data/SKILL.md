@@ -1,5 +1,5 @@
 ---
-name: anyfinancial
+name: data
 description: Query Rebyte Financial Data Service through the Relay Data API — read-only SQL over financial tables, plus semantic (vector) search over news. Use when an agent needs to discover financial tables, read a table's exact schema, run read-only SQL, or find news by meaning (not keywords) from a Rebyte VM/workspace or compatible environment.
 ---
 
