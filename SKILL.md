@@ -1,13 +1,17 @@
 ---
 name: anyfinancial
-description: Query Rebyte Financial Data Service with read-only SQL through the Relay Data API. Use when an agent needs to discover financial tables, read a table's exact schema, and run read-only SQL from a Rebyte VM/workspace or compatible environment.
+description: Query Rebyte Financial Data Service through the Relay Data API — read-only SQL over financial tables, plus semantic (vector) search over news. Use when an agent needs to discover financial tables, read a table's exact schema, run read-only SQL, or find news by meaning (not keywords) from a Rebyte VM/workspace or compatible environment.
 ---
 
 # AnyFinancial
 
-Read-only SQL access to Rebyte Financial Data Service through the Relay Data API
-(`/api/data/financial`). The service runs **Apache DataFusion SQL** (Spice.ai).
-Always work in three steps: **catalog → schema → query.**
+Access to Rebyte Financial Data Service through the Relay Data API
+(`/api/data/financial`). Two modes:
+
+- **SQL** (`/sql`) — read-only **Apache DataFusion SQL** (Spice.ai) over every table.
+  Work in three steps: **catalog → schema → query.**
+- **Semantic search** (`/search`) — vector search over datasets that carry content
+  embeddings (news). Query by *meaning*, not keywords. See the last section.
 
 ## Authentication
 
@@ -65,6 +69,33 @@ curl -fsS -X POST "$API_URL/api/data/financial/sql" \
   -H "Authorization: Bearer $AUTH_TOKEN" -H "Content-Type: application/json" \
   -d '{"sql":"SELECT trade_time, c FROM cn.bars_1m WHERE ts_code = '\''000001.SZ'\'' ORDER BY trade_time DESC LIMIT 10","parameters":[]}' | jq '.'
 ```
+
+## Semantic search — find news by meaning (not keywords)
+
+For news, prefer semantic search over `... WHERE content ILIKE '%...%'`. You send a
+natural-language `text`; the service embeds it server-side and returns the most
+similar rows ranked by `_score` (higher = more relevant). No keys, no embedding on
+your side.
+
+```bash
+python3 scripts/anyfinancial_cli.py search "Fed rate cut expectations" --columns title,published_utc,tickers
+```
+
+```bash
+curl -fsS -X POST "$API_URL/api/data/financial/search" \
+  -H "Authorization: Bearer $AUTH_TOKEN" -H "Content-Type: application/json" \
+  -d '{"text":"Fed rate cut expectations","datasets":["us.news"],"limit":5,"additional_columns":["title","published_utc","tickers"]}' | jq '.'
+```
+
+Body fields: `text` (required, natural language) · `datasets` (default `["us.news"]`
+— the only dataset with embeddings today) · `limit` (default 5) · `additional_columns`
+(optional extra columns returned in each result's `data`).
+
+Each result: `_score` (similarity), `matches.content` (hit snippets), `data` (the
+columns you named in `additional_columns`), `dataset`.
+
+> Only `us.news` is searchable today. Other tables are SQL-only — use the three-step
+> SQL flow above for them.
 
 ## SQL dialect — Apache DataFusion (NOT Postgres / MySQL / T-SQL)
 

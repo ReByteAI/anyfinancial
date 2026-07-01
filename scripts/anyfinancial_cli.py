@@ -370,6 +370,42 @@ def cmd_query(args) -> None:
         sys.exit(1)
 
 
+def _parse_csv_list(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def cmd_search(args) -> None:
+    """Semantic (vector) search over datasets that carry content embeddings."""
+    text = args.text.strip() if args.text else ""
+    if not text:
+        print("Error: provide search text as an argument.", file=sys.stderr)
+        sys.exit(1)
+
+    api_url = _resolve_api_url(args)
+    token = _resolve_token(args)
+    if not token:
+        print("Error: authentication token unavailable.", file=sys.stderr)
+        sys.exit(1)
+
+    datasets = _parse_csv_list(args.datasets) or ["us.news"]
+    payload: dict[str, Any] = {"text": text, "datasets": datasets, "limit": args.limit}
+    columns = _parse_csv_list(args.columns)
+    if columns:
+        payload["additional_columns"] = columns
+
+    url = _endpoint(api_url, "financial/search")
+    resp, body = _request_json("POST", url, token=token, payload=payload, timeout=args.timeout)
+    if args.report:
+        print("Command:")
+        print(_redacted_curl("POST", url, json.dumps(payload, ensure_ascii=False), auth=True))
+        print(f"HTTP result: {resp.status_code if resp is not None else 'request failed'}")
+    _print_json(body)
+    if _request_failed(resp, body):
+        sys.exit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="anyfinancial",
@@ -380,6 +416,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  anyfinancial catalog\n"
             "  anyfinancial schema cn.bars_1m\n"
             "  anyfinancial query \"SELECT * FROM cn.bars_1m LIMIT 10\" --report\n"
+            "  anyfinancial search \"Fed rate cut expectations\" --columns title,published_utc,tickers\n"
         ),
     )
     parser.add_argument("--api-url", help="Relay API base URL. Defaults to auth.json sandbox relay_url or https://api.rebyte.ai.")
@@ -401,6 +438,17 @@ def build_parser() -> argparse.ArgumentParser:
     query_p.add_argument("sql", nargs="?", help="SQL string. If omitted, SQL is read from stdin.")
     query_p.add_argument("--report", action="store_true", help="Report command, HTTP result, rowCount, first 3 rows, and error.")
     query_p.set_defaults(func=cmd_query)
+
+    search_p = subparsers.add_parser(
+        "search",
+        help="Semantic (vector) search over embedding-backed datasets. POST /api/data/financial/search.",
+    )
+    search_p.add_argument("text", help="Natural-language query, e.g. \"Fed rate cut expectations\".")
+    search_p.add_argument("--datasets", help="Comma-separated datasets to search. Default: us.news (only dataset with embeddings today).")
+    search_p.add_argument("--limit", type=int, default=5, help="Max results to return. Default 5.")
+    search_p.add_argument("--columns", help="Comma-separated extra columns to include per result, e.g. title,published_utc,tickers.")
+    search_p.add_argument("--report", action="store_true", help="Include exact command and HTTP result.")
+    search_p.set_defaults(func=cmd_search)
 
     return parser
 
